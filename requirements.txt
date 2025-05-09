@@ -1,0 +1,5 @@
+datasets
+transformers>=4.5.0
+wandb
+torch
+accelerate>=0.26.0
