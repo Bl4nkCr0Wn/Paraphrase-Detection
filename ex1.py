@@ -78,7 +78,7 @@ def load_test_data():
 
     # Prepare the dataset for torch
     # After tokenization we use tokenized inputs (input_ids, attention_mask) and labels
-    tokenized_datasets = tokenized_datasets.remove_columns(['sentence1', 'sentence2', 'idx'])
+    tokenized_datasets = tokenized_datasets.remove_columns(['idx'])
     # Trainer class expects the label column to be named 'labels'
     tokenized_datasets = tokenized_datasets.rename_column('label', 'labels')
     tokenized_datasets.set_format('torch')
@@ -108,7 +108,7 @@ def train_model():
         per_device_eval_batch_size=Hyperparam.batch_size,
         num_train_epochs=Hyperparam.epochs,
         logging_dir='./logs',
-        logging_steps=10,
+        logging_steps=1,
         save_total_limit=Hyperparam.epochs,# Save all checkpoints
         save_strategy='epoch',
         eval_strategy='epoch',
@@ -127,6 +127,7 @@ def train_model():
     # Train the model
     trainer.train()
     print("Model fine-tuned successfully!")
+    return trainer.evaluate()['eval_accuracy']
 
 def test_model(model_path):
     # Predict using each checkpoint
@@ -149,6 +150,14 @@ def test_model(model_path):
     )
     predictions = trainer.predict(test_dataset)
     print(f"Test Results for {model_path}: {predictions.metrics}")
+    with open('./predictions.txt', 'w') as f:
+        predicted_labels = torch.argmax(torch.tensor(predictions.predictions), dim=-1).tolist()
+        for sample, label in zip(test_dataset, predicted_labels):
+            f.write(f"{sample['sentence1']}###")
+            f.write(f"{sample['sentence2']}###")
+            f.write(f"Predicted Label: {label}\n")
+    print("Predictions saved to predictions.txt")
+
 
 def main():
     args = parse_args()
@@ -165,7 +174,9 @@ def main():
     wandb.config.epochs = Hyperparam.epochs
 
     if args.do_train:
-        train_model()
+        acc = train_model()
+        with open('./res.txt', 'a') as f:
+            f.write(f"epoch_num: {Hyperparam.epochs}, lr: {Hyperparam.learning_rate}, batch_size: {Hyperparam.batch_size}, eval_acc: {acc}\n")
     
     if args.do_predict:
         test_model(args.model_path)
